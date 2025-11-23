@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Minecraft Control</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="bg-dark text-white">
+<div class="container py-4">
+  <h1>Minecraft Control Panel</h1>
+
+  <div id="status" class="my-3">
+    {% if running %}
+      <div class="alert alert-success">Status: <b>Running</b></div>
+    {% else %}
+      <div class="alert alert-danger">Status: <b>Stopped</b></div>
+    {% endif %}
+  </div>
+
+  <div class="mb-3">
+    <form action="/start" method="post" class="d-inline">
+      <button class="btn btn-success" {% if running %}disabled{% endif %}>Start</button>
+    </form>
+    <form action="/stop" method="post" class="d-inline">
+      <button class="btn btn-danger" {% if not running %}disabled{% endif %}>Stop</button>
+    </form>
+    <form action="/restart" method="post" class="d-inline">
+      <button class="btn btn-warning">Restart</button>
+    </form>
+    <a class="btn btn-secondary" href="/download/log">Download Log</a>
+    <a class="btn btn-warning" href="/logout">Logout</a>
+  </div>
+
+  <h4>Stats</h4>
+  <pre id="stats">loading...</pre>
+
+  <h4>Console</h4>
+  <div style="background:#000;color:#0f0;padding:10px;height:320px;overflow:auto" id="console"></div>
+  <div class="mt-2">
+    <input id="cmd" class="form-control d-inline" style="width:75%" placeholder="Type command (e.g. stop)">
+    <button id="send" class="btn btn-primary">Send</button>
+  </div>
+</div>
+
+<script>
+const socket = io("/console");
+const consoleEl = document.getElementById("console");
+const statsEl = document.getElementById("stats");
+
+socket.on("connect", () => {
+  socket.emit("join", {});
+});
+
+socket.on("mc_output", (data) => {
+  consoleEl.innerText += data.line + "\n";
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+});
+
+socket.on("mc_status", (d) => {
+  consoleEl.innerText += "[status] " + JSON.stringify(d) + "\n";
+});
+
+document.getElementById("send").onclick = () => {
+  const v = document.getElementById("cmd").value;
+  if (!v) return;
+  socket.emit("mc_input", {cmd: v});
+  document.getElementById("cmd").value = "";
+};
+
+async function pollStats(){
+  try {
+    let r = await fetch("/api/status");
+    let j = await r.json();
+    statsEl.innerText = JSON.stringify(j, null, 2);
+  } catch(e){
+    statsEl.innerText = "error: " + e;
+  }
+}
+setInterval(pollStats, 2000);
+pollStats();
+</script>
+</body>
+</html>
